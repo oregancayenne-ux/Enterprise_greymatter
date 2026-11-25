@@ -13,6 +13,7 @@ A flexible direction, not a legal entity chart. Defines the architectural intent
 - **Hermes (proposed):** managed execution engine. Assessment; see `../05_PROJECTS/001_HERMES_ENGINE/`.
 - **Specialist agents:** departmental and technical workers.
 - **Model providers:** interchangeable intelligence resources.
+- **Domains:** 810wn.com (corporate); **blownapp.io** (applications — registered and verified).
 
 OC8/Hermes compatibility must be established via proof of concept before production adoption.
 

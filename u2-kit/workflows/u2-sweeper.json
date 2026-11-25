@@ -1,0 +1,124 @@
+{
+  "name": "U2 Sweeper",
+  "nodes": [
+    {
+      "parameters": {
+        "type": "clock",
+        "schedule": {
+          "interval": "1h",
+          "time": "0 * * * *"
+        },
+        "options": {}
+      },
+      "type": "clock",
+      "id": "sweeper-cron",
+      "name": "Cron: Hourly"
+    },
+    {
+      "parameters": {
+        "operation": "read",
+        "sheetId": "MOCK_GOOGLE_SHEET_ID",
+        "worksheetId": "0",
+        "header": true,
+        "columns": "phone,name,text,stage,followup_due_at,nudged",
+        "options": {}
+      },
+      "type": "googleSheets",
+      "id": "read-sheet",
+      "name": "Google Sheets: Read leads"
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "nodes": [
+            {
+              "id": "1",
+              "operator": "stringContains",
+              "field": "followup_due_at",
+              "value": "< now",
+              "property": "followup_due_at",
+              "options": {}
+            },
+            {
+              "id": "2",
+              "operator": "equals",
+              "field": "stage",
+              "value": "qualifying",
+              "property": "stage",
+              "options": {}
+            }
+          ],
+          "mode": "all",
+          "options": {}
+        },
+        "options": {}
+      },
+      "type": "if",
+      "id": "filter-due",
+      "name": "Filter: due + qualifying"
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://api.messaging.platform.com/v1/whatsapp/messages",
+        "authentication": "bearer",
+        "token": "WHATSAPP_BOT_TOKEN",
+        "queryParameters": {},
+        "headers": {
+          "Content-Type": "application/json"
+        },
+        "body": {
+          "to": "={{$json.phone}}",
+          "text": "Hi {{name || 'there'}} — following up on your lead. Quick check: are you looking to buy, or just browsing? (reply 1/2)"
+        },
+        "options": {}
+      },
+      "type": "httpRequest",
+      "id": "whatsapp-nudge",
+      "name": "HTTP Request: WhatsApp nudge"
+    },
+    {
+      "parameters": {
+        "operation": "update",
+        "resource": "sheetRow",
+        "sheetId": "MOCK_GOOGLE_SHEET_ID",
+        "worksheetId": "0",
+        "filter": "phone",
+        "data": {
+          "nudged": true,
+          "last_nudge_at": "={{$now}}"
+        },
+        "options": {}
+      },
+      "type": "googleSheets",
+      "id": "mark-nudged",
+      "name": "Google Sheets: Mark nudged"
+    }
+  ],
+  "connections": {
+    "Cron: Hourly": {
+      "main": [["read-sheet"]]
+    },
+    "Google Sheets: Read leads": {
+      "main": [["filter-due"]]
+    },
+    "Filter: due + qualifying": {
+      "yes": [["whatsapp-nudge"]],
+      "no": []
+    },
+    "HTTP Request: WhatsApp nudge": {
+      "main": [["mark-nudged"]]
+    },
+    "Google Sheets: Mark nudged": {
+      "main": []
+    }
+  },
+  "initialTrigger": {
+    "type": "clock",
+    "id": "sweeper-cron"
+  },
+  "meta": {
+    "templateName": "u2-sweeper",
+    "description": "Hourly sweeper: nudge qualifying leads past followup due date via WhatsApp"
+  }
+}

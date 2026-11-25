@@ -1,0 +1,84 @@
+{
+  "name": "U2 Inbound",
+  "nodes": [
+    {
+      "parameters": {
+        "elb": {
+          "connection": {}
+        },
+        "httpMethod": "POST",
+        "path": "u2-inbound",
+        "respondWithResponse": true,
+        "responseCode": 200,
+        "response": {
+          "body": "='' + $json.reply + '''",
+          "contentType": "application/json"
+        },
+        "options": {}
+      },
+      "type": "elb.webhook",
+      "id": "webhook-u2-inbound",
+      "name": "Webhook: POST /u2-inbound"
+    },
+    {
+      "parameters": {
+        "model": "gpt-4o-mini",
+        "prompt": "You are a warm, brief Zambian WhatsApp sales agent. Evaluate the incoming lead text and extract structured data.\n\nRULES:\n1. Respond with STRICT JSON only — no markdown, no explanations.\n2. Output format: {\"reply\": \"...\", \"stage\": \"...\", \"extracted\": {}, \"action\": \"...\"}\n3. stage must be one of: qualifying, booked, dead\n4. Ask exactly 3 questions, one at a time, in this order: (1) vehicle, (2) budget, (3) cash/financing\n5. Keep tone warm and brief.\n\nFallback: if the text is clearly not a sales lead, output {\"reply\": \"Thanks for reaching out! A sales agent will get back to you shortly.\", \"stage\": \"dead\", \"extracted\": {}, \"action\": \"nudge\"}.\n\nTEXT: ''' + $json.text + '''",
+        "options": {}
+      },
+      "type": "chatGpt",
+      "id": "llm-eval",
+      "name": "LLM: Evaluate lead"
+    },
+    {
+      "parameters": {
+        "js": "'''\nconst out = typeof $json === 'string' ? JSON.parse($json) : $json;\nlet reply = out.reply || '';\nlet stage = out.stage || 'qualifying';\nlet extracted = out.extracted || {};\nlet action = out.action || 'nudge';\n\n// If the LLM wants to ask a question, build the reply from the prompt output\nif (out.question) {\n  reply = out.question;\n  stage = 'qualifying';\n}\n\nreturn {\n  reply: reply,\n  stage: stage,\n  extracted: extracted,\n  action: action\n};\n'''",
+        "options": {}
+      },
+      "type": "code",
+      "id": "code-format",
+      "name": "Code: Format response"
+    },
+    {
+      "parameters": {
+        "operation": "create",
+        "resource": "sheetRow",
+        "sheetId": "MOCK_GOOGLE_SHEET_ID",
+        "worksheetId": "0",
+        "keepHeaders": true,
+        "data": {
+          "phone": "={{$json.phone}}",
+          "name": "={{$json.name}}",
+          "text": "={{$json.text}}",
+          "stage": "={{$json.stage}}",
+          "extracted": "={{$json.extracted}}",
+          "action": "={{$json.action}}",
+          "followup_due_at": "={{$json.createdAt || $now}}"
+        },
+        "options": {}
+      },
+      "type": "googleSheets",
+      "id": "google-sheet-mock",
+      "name": "Google Sheets (mock): Save lead state"
+    }
+  ],
+  "connections": {
+    "Webhook: POST /u2-inbound": {
+      "main": [["llm-eval"]]
+    },
+    "LLM: Evaluate lead": {
+      "main": [["code-format"]]
+    },
+    "Code: Format response": {
+      "main": [["google-sheet-mock"]]
+    }
+  },
+  "initialTrigger": {
+    "type": "elb.webhook",
+    "id": "webhook-u2-inbound"
+  },
+  "meta": {
+    "templateName": "u2-inbound",
+    "description": "Webhook: inbound lead -> LLM qualify -> save to sheet"
+  }
+}

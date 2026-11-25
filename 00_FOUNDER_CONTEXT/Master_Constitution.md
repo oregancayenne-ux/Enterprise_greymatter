@@ -8,6 +8,8 @@
 
 An AI-native technology, intelligence, automation, and venture-building enterprise with global ambition and roots in Zambia. Working name not yet fixed — referred to generically until the founder selects one.
 
+**Domains:** 810wn.com (corporate); blownapp.io (applications — registered and verified).
+
 ## Purpose
 
 [PROVISIONAL — founder to select from Options A/B/C in the change summary]
